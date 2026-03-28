@@ -12,5 +12,8 @@ resources/output/
 # Data directory (runtime project storage)
 data/
 
+# IDE
+.vscode/
+
 # OS
 .DS_Store
