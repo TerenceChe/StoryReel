@@ -6,15 +6,15 @@ This plan converts the existing CLI story-to-video tool into a web application w
 
 ## Tasks
 
-- [ ] 1. Set up project structure and backend foundation
-  - [ ] 1.1 Create backend project structure with FastAPI
+- [-] 1. Set up project structure and backend foundation
+  - [x] 1.1 Create backend project structure with FastAPI
     - Create `backend/` directory with `main.py`, `config.py`, `models.py`, `dependencies.py`
     - Set up FastAPI app with CORS middleware, environment variable configuration (`API_SECRET_KEY`, `AUTH_DISABLED`, `MAX_PROJECTS_PER_USER`, `MAX_CONCURRENT_PIPELINES_PER_USER`, `MAX_UPLOAD_SIZE_MB`, `PROJECT_TTL_HOURS`)
     - Implement fail-closed auth startup check (refuse to start if no key and AUTH_DISABLED is not true)
     - Add `backend/requirements.txt` with fastapi, uvicorn, pydantic, python-multipart, sse-starlette, httpx, hypothesis, pytest, pytest-asyncio, plus existing deps (edge-tts, openai-whisper, moviepy, Pillow)
     - _Requirements: 11.1, 11.2, 11.4, 11.5_
 
-  - [ ] 1.2 Implement Pydantic data models
+  - [x] 1.2 Implement Pydantic data models
     - Create all models from design: `Position`, `SubtitleStyle`, `SubtitleSegment`, `PipelineProgress`, `ProjectState`
     - Use `Literal` types for `stage` and `status` fields
     - Add model-level subtitle timing validator: `start_time < end_time` (Pydantic validator on SubtitleSegment)

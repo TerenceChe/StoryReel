@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment
+.env
+
+# Generated output
+resources/output/
+
+# Data directory (runtime project storage)
+data/
+
+# OS
+.DS_Store
