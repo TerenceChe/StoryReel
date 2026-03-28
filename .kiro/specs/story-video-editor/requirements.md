@@ -102,7 +102,19 @@ This feature evolves the existing Chinese story-to-video CLI tool into a web-bas
 2. WHEN a user selects a voice before generating narration, THE Pipeline SHALL use the selected voice for narration generation
 3. WHEN no voice is explicitly selected, THE Pipeline SHALL default to zh-CN-XiaoxiaoNeural
 
-### Requirement 9: Project State Persistence
+### Requirement 9: AI Background Image Generation (Opt-In)
+
+**User Story:** As a user, I want to optionally generate AI background images based on my story content, so that my videos have contextually relevant visuals instead of a plain black background.
+
+#### Acceptance Criteria
+
+1. THE Editor SHALL provide an option to generate a single AI background image for the entire video based on the story text
+2. THE Editor SHALL provide an option to generate multiple AI background images for different sections of the video, matched to subtitle segment groupings
+3. WHEN AI image generation is not enabled or not available, THE Editor SHALL use the default black background
+4. WHEN a user selects the AI image generation option, THE Editor SHALL display a placeholder indicating the feature requires an external image generation API key
+5. THE Editor SHALL design the image generation interface so that a provider (such as DALL-E) can be integrated in the future without modifying the editing workflow
+
+### Requirement 10: Project State Persistence
 
 **User Story:** As a user, I want my project state to be preserved during my editing session, so that I do not lose work if I navigate away briefly or refresh the page.
 
@@ -111,3 +123,15 @@ This feature evolves the existing Chinese story-to-video CLI tool into a web-bas
 1. WHEN a user makes any edit (subtitle position, style, timing, or background image), THE Editor SHALL save the Project state to the backend
 2. WHEN a user reloads the page for an active Project, THE Editor SHALL restore the most recent Project state including all edits
 3. THE Editor SHALL assign each Project a unique identifier that can be used to reload it
+
+### Requirement 11: Cloud Deployment Readiness
+
+**User Story:** As a developer, I want the application architecture to support straightforward deployment to AWS, so that I can host the editor for remote users without major refactoring.
+
+#### Acceptance Criteria
+
+1. THE Editor SHALL separate frontend static assets from the backend API so that each can be deployed independently
+2. THE Editor SHALL use environment variables for all configurable values including API URLs, file storage paths, and service endpoints
+3. THE Editor SHALL store generated files (audio, images, video) through a file storage abstraction that can be backed by local disk or cloud object storage (such as S3)
+4. THE Editor SHALL expose the backend as a stateless HTTP API so that it can run behind a load balancer or in a container service
+5. THE Editor SHALL support configurable CORS settings to allow the frontend to be served from a different origin than the backend API
