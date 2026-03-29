@@ -5,7 +5,6 @@ import os
 
 class Settings:
     API_SECRET_KEY: str | None = os.getenv("API_SECRET_KEY")
-    AUTH_DISABLED: bool = os.getenv("AUTH_DISABLED", "").lower() == "true"
     DEV_OWNER_ID: str = os.getenv("DEV_OWNER_ID", "dev-user")
     MAX_PROJECTS_PER_USER: int = int(os.getenv("MAX_PROJECTS_PER_USER", "20"))
     MAX_CONCURRENT_PIPELINES_PER_USER: int = int(os.getenv("MAX_CONCURRENT_PIPELINES_PER_USER", "2"))

@@ -9,8 +9,8 @@ This plan converts the existing CLI story-to-video tool into a web application w
 - [x] 1. Set up project structure and backend foundation
   - [x] 1.1 Create backend project structure with FastAPI
     - Create `backend/` directory with `main.py`, `config.py`, `models.py`, `dependencies.py`
-    - Set up FastAPI app with CORS middleware, environment variable configuration (`API_SECRET_KEY`, `AUTH_DISABLED`, `DEV_OWNER_ID`, `MAX_PROJECTS_PER_USER`, `MAX_CONCURRENT_PIPELINES_PER_USER`, `MAX_UPLOAD_SIZE_MB`)
-    - Implement fail-closed auth startup check (refuse to start if no key and AUTH_DISABLED is not true)
+    - Set up FastAPI app with CORS middleware, environment variable configuration (`API_SECRET_KEY`, `DEV_OWNER_ID`, `MAX_PROJECTS_PER_USER`, `MAX_CONCURRENT_PIPELINES_PER_USER`, `MAX_UPLOAD_SIZE_MB`)
+    - Implement fail-closed auth startup check (refuse to start if no API_SECRET_KEY is set)
     - Add `backend/requirements.txt` with fastapi, uvicorn, pydantic, python-multipart, sse-starlette, httpx, hypothesis, pytest, pytest-asyncio, plus existing deps (edge-tts, openai-whisper, moviepy, Pillow)
     - _Requirements: 11.1, 11.2, 11.4, 11.5_
 
@@ -48,13 +48,12 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - **Property 8: Project ID uniqueness**
     - **Validates: Requirements 10.3**
 
-- [ ] 3. Implement authentication middleware
-  - [ ] 3.1 Create auth middleware
+- [x] 3. Implement authentication middleware
+  - [x] 3.1 Create auth middleware
     - Create `backend/auth.py` with pluggable auth middleware
     - Implement Bearer token validation against API_SECRET_KEY
     - Extract owner_id from token/request
     - Add ownership check in project endpoints (return 403 if not owner)
-    - Support AUTH_DISABLED=true for local development (assigns fixed `DEV_OWNER_ID` to all requests)
     - All users must be authenticated — no anonymous access
     - _Requirements: 11.2_
 
@@ -209,3 +208,13 @@ This plan converts the existing CLI story-to-video tool into a web application w
 
 - [ ] 13. Final checkpoint — Full integration
   - Ensure all tests pass, ask the user if questions arise.
+
+- [ ]* 14. Upgrade to JWT-based authentication
+  - [ ]* 14.1 Replace shared-secret auth with JWT/Cognito
+    - Replace Bearer token comparison in `backend/auth.py` with JWT validation (e.g., Amazon Cognito or any OIDC provider)
+    - Validate tokens against the provider's JWKS endpoint
+    - Extract `owner_id` from the JWT `sub` claim instead of the `X-Owner-Id` header
+    - Add environment variables for JWT issuer URL, audience, and JWKS URI
+    - Keep Bearer token auth mode for local development (set API_SECRET_KEY in .env)
+    - Update tests to cover JWT validation, expired tokens, and invalid signatures
+    - _Requirements: 11.2_
