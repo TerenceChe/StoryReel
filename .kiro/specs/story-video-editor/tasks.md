@@ -6,7 +6,7 @@ This plan converts the existing CLI story-to-video tool into a web application w
 
 ## Tasks
 
-- [-] 1. Set up project structure and backend foundation
+- [x] 1. Set up project structure and backend foundation
   - [x] 1.1 Create backend project structure with FastAPI
     - Create `backend/` directory with `main.py`, `config.py`, `models.py`, `dependencies.py`
     - Set up FastAPI app with CORS middleware, environment variable configuration (`API_SECRET_KEY`, `AUTH_DISABLED`, `MAX_PROJECTS_PER_USER`, `MAX_CONCURRENT_PIPELINES_PER_USER`, `MAX_UPLOAD_SIZE_MB`, `PROJECT_TTL_HOURS`)
@@ -22,7 +22,7 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - Create `ImageGenerationBackend` abstract class with `generate_single` and `generate_sectioned` methods (placeholder for future provider integration)
     - _Requirements: 5.2, 5.3, 9.5_
 
-  - [ ]* 1.3 Write property tests for data models
+  - [x] 1.3 Write property tests for data models
     - **Property 5: Subtitle timing validation**
     - **Validates: Requirements 5.2, 5.3**
 
