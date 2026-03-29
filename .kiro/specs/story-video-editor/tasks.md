@@ -27,7 +27,7 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - **Validates: Requirements 5.2, 5.3**
 
 - [ ] 2. Implement storage layer and project service
-  - [ ] 2.1 Implement StorageBackend abstract class and LocalStorageBackend
+  - [x] 2.1 Implement StorageBackend abstract class and LocalStorageBackend
     - Create `backend/storage.py` with `StorageBackend` ABC (save_file with AsyncIterator, save_file_from_path default impl using sync I/O — acceptable since pipeline runs in background threads, load_file, get_file_url, delete_project)
     - Implement `LocalStorageBackend` storing files under `./data/projects/{project_id}/`
     - _Requirements: 11.3_

@@ -12,3 +12,4 @@ openai-whisper>=20231117
 moviepy>=2.0.0
 Pillow>=10.0.0
 python-dotenv>=1.0.0
+aiofiles>=23.0.0
