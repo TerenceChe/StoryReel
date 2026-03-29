@@ -12,10 +12,10 @@ import sys
 import tempfile
 from pathlib import Path
 
-from image_gen import generate_black_image
-from narration import generate_narration
-from subtitles import build_srt, generate_timestamps
-from video import create_video_with_subtitles
+from backend.pipeline.image_gen import generate_black_image
+from backend.pipeline.narration import generate_narration
+from backend.pipeline.subtitles import build_srt, generate_timestamps
+from backend.pipeline.video import create_video_with_subtitles
 
 
 def main():

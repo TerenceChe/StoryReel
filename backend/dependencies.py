@@ -1,7 +1,7 @@
 """FastAPI dependency injection providers."""
 
 from backend.config import settings
-from backend.storage import LocalStorageBackend, StorageBackend
+from backend.persistence import LocalStorageBackend, StorageBackend
 
 _storage_backend: StorageBackend = LocalStorageBackend()
 
