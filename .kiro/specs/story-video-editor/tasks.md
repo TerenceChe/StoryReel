@@ -57,8 +57,8 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - All users must be authenticated — no anonymous access
     - _Requirements: 11.2_
 
-- [ ] 4. Refactor pipeline for backend integration
-  - [ ] 4.1 Refactor existing pipeline modules
+- [x] 4. Refactor pipeline for backend integration
+  - [x] 4.1 Refactor existing pipeline modules
     - Modify `narration.py` to accept voice parameter and return audio duration
     - Modify `subtitles.py` to return structured segment data (with UUIDs, default positions/styles)
     - Modify `video.py` `_render_text_frame` to accept per-subtitle position and style (normalized → pixel conversion using target resolution 1792×1024)
@@ -66,7 +66,7 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - Add font fallback chain: Noto Sans CJK SC → PingFang → system default
     - _Requirements: 1.1, 3.3, 4.3, 7.1, 8.2_
 
-  - [ ] 4.2 Implement PipelineService
+  - [x] 4.2 Implement PipelineService
     - Create `backend/services/pipeline_service.py`
     - Implement `run_pipeline`: orchestrate narration → subtitles → preview video, update project state at each stage, write files via StorageBackend
     - Implement `export_video`: re-render video using edited project state (positions, styles, timings, background image)
@@ -75,7 +75,7 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - Enforce MAX_CONCURRENT_PIPELINES_PER_USER limit
     - _Requirements: 1.1, 1.4, 7.1, 7.4, 8.2, 8.3_
 
-  - [ ]* 4.3 Write property tests for pipeline input validation
+  - [ ] 4.3 Write property tests for pipeline input validation
     - **Property 1: Whitespace text rejection**
     - **Validates: Requirements 1.3**
     - **Property 6: Project creation for valid text**
@@ -106,7 +106,7 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - GET /voices — return list of available edge-tts voices
     - _Requirements: 6.1, 6.2, 8.1_
 
-  - [ ]* 5.4 Write unit tests for API endpoints
+  - [ ] 5.4 Write unit tests for API endpoints
     - Test validation errors (empty text, invalid timing, path traversal)
     - Test auth (401 unauthorized, 403 forbidden)
     - Test optimistic concurrency (409 conflict)
@@ -156,11 +156,11 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - PreviewPlayer: HTML5 audio element with custom play/pause controls, synchronize playback position via shared hook, display current timestamp, seek support
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 6.2, 6.3_
 
-  - [ ]* 9.2 Write property tests for position clamping
+  - [ ] 9.2 Write property tests for position clamping
     - **Property 3: Position clamping within bounds**
     - **Validates: Requirements 3.2**
 
-  - [ ]* 9.3 Write property tests for subtitle visibility
+  - [ ] 9.3 Write property tests for subtitle visibility
     - **Property 2: Visible subtitles at time T**
     - **Validates: Requirements 2.3**
 

@@ -15,7 +15,7 @@ from pathlib import Path
 from backend.pipeline.image_gen import generate_black_image
 from backend.pipeline.narration import generate_narration
 from backend.pipeline.subtitles import build_srt, generate_timestamps
-from backend.pipeline.video import create_video_with_subtitles
+from backend.pipeline.video import create_video_from_srt
 
 
 def main():
@@ -24,6 +24,11 @@ def main():
     parser.add_argument(
         "-o", "--output", default="output.mp4",
         help="Output video path (default: output.mp4)",
+    )
+    parser.add_argument(
+        "-v", "--voice", default="zh-CN-XiaoxiaoNeural",
+        help="Edge-tts voice (default: zh-CN-XiaoxiaoNeural). "
+             "Options: zh-CN-XiaoxiaoNeural, zh-CN-YunxiNeural, zh-CN-YunjianNeural",
     )
     args = parser.parse_args()
 
@@ -49,7 +54,7 @@ def main():
         # 2. Generate narration (edge-tts, free, no API key)
         print("Generating Chinese narration...")
         audio_path = os.path.join(tmp_dir, "narration.mp3")
-        generate_narration(story, audio_path)
+        generate_narration(story, audio_path, voice=args.voice)
 
         # 3. Generate subtitles using local Whisper
         print("Generating subtitle timestamps (local Whisper)...")
@@ -61,7 +66,7 @@ def main():
 
         # 4. Assemble final video
         print("Assembling video with subtitles...")
-        create_video_with_subtitles(image_path, audio_path, srt_path, args.output)
+        create_video_from_srt(image_path, audio_path, srt_path, args.output)
 
     print("Done!")
 
