@@ -6,13 +6,12 @@ import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
-from backend.auth import get_owner_id, verify_project_ownership
-from backend.auth import middleware as auth_mod
+from backend.auth import get_owner_id, get_settings, verify_project_ownership
 from backend.config import Settings
 
 
 # ---------------------------------------------------------------------------
-# Helpers — build a tiny app per test scenario
+# Helpers
 # ---------------------------------------------------------------------------
 
 def _make_app(app_settings: Settings) -> FastAPI:
@@ -23,8 +22,8 @@ def _make_app(app_settings: Settings) -> FastAPI:
     async def me(owner_id: str = Depends(get_owner_id)):
         return {"owner_id": owner_id}
 
-    # Patch the module-level settings reference.
-    auth_mod._default_settings = app_settings
+    # Override the settings dependency cleanly.
+    app.dependency_overrides[get_settings] = lambda: app_settings
 
     return app
 
@@ -34,16 +33,12 @@ def _make_app(app_settings: Settings) -> FastAPI:
 # ---------------------------------------------------------------------------
 
 class TestTokenValidation:
-    def setup_method(self):
-        self.settings = Settings.__new__(Settings)
+    def setup_method(self, monkeypatch=None):
+        self.settings = Settings()
         self.settings.API_SECRET_KEY = "test-secret-key"
         self.settings.DEV_OWNER_ID = "dev-user"
         self.app = _make_app(self.settings)
         self.client = TestClient(self.app)
-
-    def teardown_method(self):
-        from backend.config import settings as default_settings
-        auth_mod._default_settings = default_settings
 
     def test_missing_token_returns_401(self):
         resp = self.client.get("/me")
@@ -81,7 +76,6 @@ class TestTokenValidation:
 
 class TestOwnershipVerification:
     def test_matching_owner_passes(self):
-        # Should not raise
         verify_project_ownership("user-1", "user-1")
 
     def test_mismatched_owner_raises_403(self):
