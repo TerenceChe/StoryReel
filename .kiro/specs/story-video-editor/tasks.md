@@ -9,7 +9,7 @@ This plan converts the existing CLI story-to-video tool into a web application w
 - [x] 1. Set up project structure and backend foundation
   - [x] 1.1 Create backend project structure with FastAPI
     - Create `backend/` directory with `main.py`, `config.py`, `models.py`, `dependencies.py`
-    - Set up FastAPI app with CORS middleware, environment variable configuration (`API_SECRET_KEY`, `AUTH_DISABLED`, `MAX_PROJECTS_PER_USER`, `MAX_CONCURRENT_PIPELINES_PER_USER`, `MAX_UPLOAD_SIZE_MB`, `PROJECT_TTL_HOURS`)
+    - Set up FastAPI app with CORS middleware, environment variable configuration (`API_SECRET_KEY`, `AUTH_DISABLED`, `DEV_OWNER_ID`, `MAX_PROJECTS_PER_USER`, `MAX_CONCURRENT_PIPELINES_PER_USER`, `MAX_UPLOAD_SIZE_MB`)
     - Implement fail-closed auth startup check (refuse to start if no key and AUTH_DISABLED is not true)
     - Add `backend/requirements.txt` with fastapi, uvicorn, pydantic, python-multipart, sse-starlette, httpx, hypothesis, pytest, pytest-asyncio, plus existing deps (edge-tts, openai-whisper, moviepy, Pillow)
     - _Requirements: 11.1, 11.2, 11.4, 11.5_
@@ -32,7 +32,7 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - Implement `LocalStorageBackend` storing files under `./data/projects/{project_id}/`
     - _Requirements: 11.3_
 
-  - [ ] 2.2 Implement ProjectService
+  - [x] 2.2 Implement ProjectService
     - Create `backend/services/project_service.py`
     - Implement CRUD: create_project (UUID generation, owner_id), get_project, update_project (optimistic concurrency version check), delete_project, list_projects (summaries only)
     - In update_project: validate subtitle timing bounds against audio_duration when audio_duration is known (0 <= start_time, end_time <= audio_duration)
@@ -40,13 +40,9 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - Enforce MAX_PROJECTS_PER_USER limit on creation
     - _Requirements: 10.1, 10.2, 10.3, 1.1, 5.2, 5.3_
 
-  - [ ] 2.3 Implement TTL cleanup background task
-    - Create a background task that runs every hour (configurable via `CLEANUP_INTERVAL_MINUTES` env var, default 60) and deletes projects older than PROJECT_TTL_HOURS
-    - Skip projects with status `processing` or `exporting`
-    - Use StorageBackend.delete_project for cleanup
-    - _Requirements: 11.2_
+  - [x] 2.3 ~~Implement TTL cleanup background task~~ (Removed — all users are authenticated; users manage their own projects via DELETE)
 
-  - [ ]* 2.4 Write property tests for ProjectService
+  - [x] 2.4 Write property tests for ProjectService
     - **Property 4: Project state save/load round trip**
     - **Validates: Requirements 3.3, 4.3, 5.1, 10.1, 10.2**
     - **Property 8: Project ID uniqueness**
@@ -58,7 +54,8 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - Implement Bearer token validation against API_SECRET_KEY
     - Extract owner_id from token/request
     - Add ownership check in project endpoints (return 403 if not owner)
-    - Support AUTH_DISABLED=true for local development
+    - Support AUTH_DISABLED=true for local development (assigns fixed `DEV_OWNER_ID` to all requests)
+    - All users must be authenticated — no anonymous access
     - _Requirements: 11.2_
 
 - [ ] 4. Refactor pipeline for backend integration

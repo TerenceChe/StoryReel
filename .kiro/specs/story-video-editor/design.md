@@ -140,9 +140,9 @@ Both SSE endpoints (`/projects/{id}/status` and `/projects/{id}/export/status`) 
 
 ### Authentication
 
-The backend supports a pluggable authentication middleware:
+The backend requires authentication for all users. There is no anonymous access.
 
-- **Local development**: A simple token-based auth using a configurable API key passed via `Authorization: Bearer <token>` header. The key is set via the `API_SECRET_KEY` environment variable. Auth can only be disabled by explicitly setting `AUTH_DISABLED=true` — if neither `API_SECRET_KEY` nor `AUTH_DISABLED=true` is set, the server refuses to start (fail closed).
+- **Local development**: A simple token-based auth using a configurable API key passed via `Authorization: Bearer <token>` header. The key is set via the `API_SECRET_KEY` environment variable. When `AUTH_DISABLED=true`, the server skips token validation and assigns all requests to a fixed dev user identity (`DEV_OWNER_ID`, default `"dev-user"`). If neither `API_SECRET_KEY` nor `AUTH_DISABLED=true` is set, the server refuses to start (fail closed).
 - **AWS deployment (future)**: Swap to Amazon Cognito or any JWT-based provider. The middleware validates the JWT and extracts the user ID.
 
 Each project stores an `owner_id` field. The auth middleware extracts the user identity from the request and the project service verifies that the requesting user matches the project owner. Project IDs use UUIDs (not sequential) to prevent enumeration.
@@ -154,8 +154,7 @@ To prevent disk exhaustion and abuse, the backend enforces configurable limits v
 - `MAX_PROJECTS_PER_USER` (default: 20) — maximum active projects per user. Creating a project beyond this limit returns 429.
 - `MAX_CONCURRENT_PIPELINES_PER_USER` (default: 2) — maximum simultaneous pipeline/export jobs per user. Additional requests return 429 with a retry-after suggestion.
 - `MAX_UPLOAD_SIZE_MB` (default: 50) — maximum file upload size for background images and text files.
-- `PROJECT_TTL_HOURS` (default: 72) — projects older than this are eligible for cleanup by a background task. The cleanup task skips projects with status `processing` or `exporting`.
-- `AUTH_DISABLED` (default: false) — must be explicitly set to `true` to disable authentication. If `API_SECRET_KEY` is not set and `AUTH_DISABLED` is not `true`, the server refuses to start. This prevents accidental production exposure.
+- `AUTH_DISABLED` (default: false) — must be explicitly set to `true` to disable authentication. When disabled, all requests are assigned to a fixed dev user (`DEV_OWNER_ID`). If `API_SECRET_KEY` is not set and `AUTH_DISABLED` is not `true`, the server refuses to start. This prevents accidental production exposure.
 
 ### Backend Components
 
