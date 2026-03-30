@@ -26,7 +26,7 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - **Property 5: Subtitle timing validation**
     - **Validates: Requirements 5.2, 5.3**
 
-- [ ] 2. Implement storage layer and project service
+- [x] 2. Implement storage layer and project service
   - [x] 2.1 Implement StorageBackend abstract class and LocalStorageBackend
     - Create `backend/storage.py` with `StorageBackend` ABC (save_file with AsyncIterator, save_file_from_path default impl using sync I/O — acceptable since pipeline runs in background threads, load_file, get_file_url, delete_project)
     - Implement `LocalStorageBackend` storing files under `./data/projects/{project_id}/`
@@ -75,7 +75,7 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - Enforce MAX_CONCURRENT_PIPELINES_PER_USER limit
     - _Requirements: 1.1, 1.4, 7.1, 7.4, 8.2, 8.3_
 
-  - [ ] 4.3 Write property tests for pipeline input validation
+  - [x] 4.3 Write property tests for pipeline input validation
     - **Property 1: Whitespace text rejection**
     - **Validates: Requirements 1.3**
     - **Property 6: Project creation for valid text**
@@ -83,8 +83,8 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - **Property 7: Voice selection propagation**
     - **Validates: Requirements 8.2**
 
-- [ ] 5. Implement API endpoints
-  - [ ] 5.1 Implement project CRUD endpoints
+- [x] 5. Implement API endpoints
+  - [x] 5.1 Implement project CRUD endpoints
     - POST /projects — create project, validate text (reject whitespace-only), start pipeline as background task
     - GET /projects — list user's projects (summaries: id, title, status, createdAt, updatedAt)
     - GET /projects/{id} — get full project state
@@ -92,7 +92,7 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - DELETE /projects/{id} — delete project and files
     - _Requirements: 1.1, 1.3, 10.1, 10.2, 10.3_
 
-  - [ ] 5.2 Implement SSE and export endpoints
+  - [x] 5.2 Implement SSE and export endpoints
     - GET /projects/{id}/status — SSE stream for pipeline progress (send current state on connect, comment-only keepalive every 15s, close on complete/error)
     - POST /projects/{id}/export — trigger async export, return 202
     - GET /projects/{id}/export/status — SSE stream for export progress
@@ -100,31 +100,31 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - POST /projects/{id}/retry — retry from failed stage (422 if not in error state)
     - _Requirements: 1.4, 7.1, 7.2, 7.3_
 
-  - [ ] 5.3 Implement media and upload endpoints
+  - [x] 5.3 Implement media and upload endpoints
     - GET /projects/{id}/media/{filename} — serve media files with path traversal validation (reject `..`, `/`, `\` in filename, return 400)
     - POST /projects/{id}/background — upload background image (PNG/JPG validation, MAX_UPLOAD_SIZE_MB limit, return 413 if exceeded)
     - GET /voices — return list of available edge-tts voices
     - _Requirements: 6.1, 6.2, 8.1_
 
-  - [ ] 5.4 Write unit tests for API endpoints
+  - [x] 5.4 Write unit tests for API endpoints
     - Test validation errors (empty text, invalid timing, path traversal)
     - Test auth (401 unauthorized, 403 forbidden)
     - Test optimistic concurrency (409 conflict)
     - Test resource limits (429 too many projects, 413 file too large)
     - _Requirements: 1.3, 5.2, 5.3_
 
-- [ ] 6. Checkpoint — Backend complete
+- [-] 6. Checkpoint — Backend complete
   - Ensure all backend tests pass, ask the user if questions arise.
 
 - [ ] 7. Set up frontend project
-  - [ ] 7.1 Initialize React + TypeScript frontend
+  - [~] 7.1 Initialize React + TypeScript frontend
     - Create `frontend/` with Vite + React + TypeScript
     - Install dependencies: react-konva, konva, axios (or fetch wrapper)
     - Set up API client with configurable base URL from environment variable (VITE_API_URL)
     - Define TypeScript interfaces matching backend models (Project, SubtitleSegment, Position, SubtitleStyle, PipelineProgress)
     - _Requirements: 11.1, 11.2_
 
-  - [ ] 7.2 Implement API client, SSE hooks, and error handling infrastructure
+  - [~] 7.2 Implement API client, SSE hooks, and error handling infrastructure
     - Create API client module with functions for all backend endpoints
     - Create `useSSE` custom hook for consuming SSE streams (pipeline status, export status). Filter out comment-only keepalive pings. Handle reconnection and current-state-on-connect
     - Create `useProject` hook for project state management (fetch, update with version tracking, handle 409 conflicts by reloading)
@@ -134,7 +134,7 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - _Requirements: 1.4, 10.1, 10.2_
 
 - [ ] 8. Implement project creation flow
-  - [ ] 8.1 Build project creation page
+  - [~] 8.1 Build project creation page
     - Text input area for story text with submit button
     - Client-side file read (.txt) using FileReader API to populate text area (no backend upload)
     - VoiceSelector dropdown (populated from /voices endpoint, defaults to XiaoxiaoNeural)
@@ -142,7 +142,7 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - On submit: call POST /projects, navigate to editor page
     - _Requirements: 1.1, 1.2, 1.3, 8.1, 8.2, 8.3_
 
-  - [ ] 8.2 Build pipeline progress view
+  - [~] 8.2 Build pipeline progress view
     - Display progress indicators for each pipeline stage using SSE hook
     - Show stage transitions: narration → subtitles → assembly → complete
     - Handle error state with retry button (calls POST /projects/{id}/retry)
@@ -150,29 +150,29 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - _Requirements: 1.4, 1.5_
 
 - [ ] 9. Implement video editor canvas and preview
-  - [ ] 9.1 Build VideoCanvas and PreviewPlayer with shared playback state
+  - [~] 9.1 Build VideoCanvas and PreviewPlayer with shared playback state
     - Create a shared `usePlayback` hook that manages current time, play/pause state, and seek position — used by both Canvas and PreviewPlayer
     - VideoCanvas (react-konva): render background image (or black default) as base layer, render subtitle overlays as draggable Konva Text nodes, convert between normalized (0-1) and pixel coordinates, implement drag-to-reposition with boundary clamping, highlight selected subtitle, show/hide subtitles based on current time using half-open interval (start_time <= T < end_time)
     - PreviewPlayer: HTML5 audio element with custom play/pause controls, synchronize playback position via shared hook, display current timestamp, seek support
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 6.2, 6.3_
 
-  - [ ] 9.2 Write property tests for position clamping
+  - [~] 9.2 Write property tests for position clamping
     - **Property 3: Position clamping within bounds**
     - **Validates: Requirements 3.2**
 
-  - [ ] 9.3 Write property tests for subtitle visibility
+  - [~] 9.3 Write property tests for subtitle visibility
     - **Property 2: Visible subtitles at time T**
     - **Validates: Requirements 2.3**
 
 - [ ] 10. Implement subtitle editing panels
-  - [ ] 10.1 Build SubtitleStylePanel
+  - [~] 10.1 Build SubtitleStylePanel
     - Font size slider (normalized value, display as approximate pixel equivalent)
     - Font color and outline color pickers
     - Font family dropdown with CJK-compatible options (Noto Sans CJK SC, PingFang, etc.)
     - Apply changes in real time to Canvas and persist to project state via PUT
     - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-  - [ ] 10.2 Build Timeline component
+  - [~] 10.2 Build Timeline component
     - Horizontal timeline with subtitle segments as blocks
     - Draggable block edges for adjusting start/end times
     - Display overlapping segments as stacked rows
@@ -180,7 +180,7 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - Persist timing changes via PUT with version tracking
     - _Requirements: 5.1, 5.2, 5.3_
 
-  - [ ] 10.3 Build BackgroundUploader and AI image generation placeholder
+  - [~] 10.3 Build BackgroundUploader and AI image generation placeholder
     - File upload for PNG/JPG with client-side format and size validation
     - Call POST /projects/{id}/background on upload
     - Update Canvas to display uploaded image
@@ -193,13 +193,13 @@ This plan converts the existing CLI story-to-video tool into a web application w
   - Ensure the editor works end-to-end: create project → pipeline → edit subtitles → preview. Ask the user if questions arise.
 
 - [ ] 12. Implement export and project management
-  - [ ] 12.1 Build export flow
+  - [~] 12.1 Build export flow
     - Export button triggers POST /projects/{id}/export
     - Display export progress via SSE stream
     - On completion: show download link (GET /projects/{id}/export/download)
     - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-  - [ ] 12.2 Build project list page
+  - [~] 12.2 Build project list page
     - Fetch and display user's projects from GET /projects
     - Show project title, status, creation date
     - Click to open project in editor
@@ -209,8 +209,8 @@ This plan converts the existing CLI story-to-video tool into a web application w
 - [ ] 13. Final checkpoint — Full integration
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ]* 14. Upgrade to JWT-based authentication
-  - [ ]* 14.1 Replace shared-secret auth with JWT/Cognito
+- [ ] 14. Upgrade to JWT-based authentication
+  - [~] 14.1 Replace shared-secret auth with JWT/Cognito
     - Replace Bearer token comparison in `backend/auth.py` with JWT validation (e.g., Amazon Cognito or any OIDC provider)
     - Validate tokens against the provider's JWKS endpoint
     - Extract `owner_id` from the JWT `sub` claim instead of the `X-Owner-Id` header
