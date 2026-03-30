@@ -48,7 +48,11 @@ def project_service(storage, test_settings):
 
 @pytest.fixture()
 def pipeline_service(storage, project_service, test_settings):
-    return PipelineService(storage=storage, project_service=project_service, settings=test_settings)
+    from unittest.mock import AsyncMock
+
+    svc = PipelineService(storage=storage, project_service=project_service, settings=test_settings)
+    svc.run_pipeline = AsyncMock()
+    return svc
 
 
 @pytest.fixture()

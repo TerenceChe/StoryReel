@@ -113,11 +113,11 @@ This plan converts the existing CLI story-to-video tool into a web application w
     - Test resource limits (429 too many projects, 413 file too large)
     - _Requirements: 1.3, 5.2, 5.3_
 
-- [-] 6. Checkpoint — Backend complete
+- [x] 6. Checkpoint — Backend complete
   - Ensure all backend tests pass, ask the user if questions arise.
 
 - [ ] 7. Set up frontend project
-  - [~] 7.1 Initialize React + TypeScript frontend
+  - [-] 7.1 Initialize React + TypeScript frontend
     - Create `frontend/` with Vite + React + TypeScript
     - Install dependencies: react-konva, konva, axios (or fetch wrapper)
     - Set up API client with configurable base URL from environment variable (VITE_API_URL)
