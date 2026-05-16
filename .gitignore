@@ -16,5 +16,9 @@ data/
 # IDE
 .vscode/
 
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
 # OS
 .DS_Store

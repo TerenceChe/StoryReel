@@ -1,5 +1,7 @@
 """Subtitle-related data models."""
 
+from typing import Literal
+
 from pydantic import BaseModel, model_validator
 
 
@@ -13,6 +15,11 @@ class SubtitleStyle(BaseModel):
     font_color: str = "#FFFFFF"
     outline_color: str = "#000000"
     font_family: str = "Noto Sans CJK SC"
+    # Maximum line width as fraction of the video width. The renderer wraps
+    # text so each line fits within max_width × video_width pixels.
+    max_width: float = 0.5
+    # Per-line horizontal alignment inside the wrap box.
+    align: Literal["left", "center", "right"] = "center"
 
 
 class SubtitleSegment(BaseModel):

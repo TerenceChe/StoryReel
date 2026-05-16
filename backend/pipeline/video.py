@@ -1,16 +1,263 @@
-"""Video assembly module — combines image, audio, and subtitles using moviepy + Pillow."""
+"""Video assembly module — combines image, audio, and subtitles using moviepy + Pillow.
 
-import textwrap
+Supports two modes:
+1. Legacy SRT-based rendering (for CLI backward compatibility)
+2. ProjectState-based rendering with per-subtitle position and style
+"""
 
 import numpy as np
 from moviepy import (
     AudioFileClip,
     CompositeVideoClip,
     ImageClip,
-    VideoClip,
 )
 from PIL import Image, ImageDraw, ImageFont
 
+from backend.models.subtitle import SubtitleSegment
+
+# Target video resolution
+VIDEO_WIDTH = 1792
+VIDEO_HEIGHT = 1024
+
+# Font fallback chain: Noto Sans CJK SC → PingFang → system default
+_FONT_FALLBACK_PATHS: dict[str, list[str]] = {
+    "Noto Sans CJK SC": [
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+        "/usr/local/share/fonts/NotoSansCJK-Regular.ttc",
+    ],
+    "PingFang": [
+        "/System/Library/Fonts/PingFang.ttc",
+    ],
+    "__system__": [
+        "/System/Library/Fonts/STHeiti Light.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ],
+}
+
+# Ordered list of font families to try
+_FONT_FALLBACK_ORDER = ["Noto Sans CJK SC", "PingFang", "__system__"]
+
+
+def _resolve_font(font_family: str, font_size_px: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    """Resolve a font family name to a Pillow font object.
+
+    Tries the requested font_family first, then falls through the fallback
+    chain: Noto Sans CJK SC → PingFang → system default → Pillow default.
+    """
+    # Build search order: requested family first, then fallbacks
+    families_to_try = [font_family] + [
+        f for f in _FONT_FALLBACK_ORDER if f != font_family
+    ]
+
+    for family in families_to_try:
+        paths = _FONT_FALLBACK_PATHS.get(family, [])
+        for path in paths:
+            try:
+                return ImageFont.truetype(path, font_size_px)
+            except (OSError, IOError):
+                continue
+
+    # Last resort: Pillow built-in bitmap font
+    return ImageFont.load_default()
+
+
+def _hex_to_rgba(hex_color: str, alpha: int = 255) -> tuple[int, int, int, int]:
+    """Convert a hex color string (#RRGGBB) to an RGBA tuple."""
+    hex_color = hex_color.lstrip("#")
+    if len(hex_color) != 6:
+        return (255, 255, 255, alpha)
+    r = int(hex_color[0:2], 16)
+    g = int(hex_color[2:4], 16)
+    b = int(hex_color[4:6], 16)
+    return (r, g, b, alpha)
+
+
+def _wrap_to_pixel_width(
+    text: str,
+    font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    max_pixel_width: int,
+    draw: ImageDraw.ImageDraw,
+) -> str:
+    """Wrap *text* so each line fits within max_pixel_width.
+
+    Works for both space-separated languages and CJK by falling back to
+    character-by-character wrapping when there are no spaces in the text.
+    Returns the wrapped text with ``\n`` between lines.
+    """
+    if max_pixel_width <= 0:
+        return text
+
+    def measure(s: str) -> int:
+        bbox = draw.textbbox((0, 0), s, font=font)
+        return bbox[2] - bbox[0]
+
+    # Try word-level wrapping first; if there are no spaces, fall back to chars.
+    has_words = any(c.isspace() for c in text)
+    units = text.split() if has_words else list(text)
+    sep = " " if has_words else ""
+
+    lines: list[str] = []
+    current = ""
+    for unit in units:
+        candidate = current + (sep if current else "") + unit
+        if measure(candidate) <= max_pixel_width or not current:
+            current = candidate
+        else:
+            lines.append(current)
+            current = unit
+    if current:
+        lines.append(current)
+    return "\n".join(lines)
+
+
+def _render_text_frame(
+    text: str,
+    width: int,
+    height: int,
+    *,
+    x_norm: float = 0.5,
+    y_norm: float = 0.85,
+    font_size_norm: float = 0.047,
+    font_color: str = "#FFFFFF",
+    outline_color: str = "#000000",
+    font_family: str = "Noto Sans CJK SC",
+    max_width_norm: float = 0.5,
+    align: str = "center",
+) -> np.ndarray:
+    """Render Chinese text onto a transparent RGBA image using Pillow.
+
+    Positions and font size are given as normalized values (0-1 fractions of
+    the video dimensions) and converted to pixel coordinates using the
+    provided width/height. Each wrapped line is independently aligned within
+    the wrap box according to ``align``.
+    """
+    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    font_size_px = max(1, int(font_size_norm * height))
+    font = _resolve_font(font_family, font_size_px)
+
+    max_pixel_width = max(1, int(max_width_norm * width))
+    wrapped = _wrap_to_pixel_width(text, font, max_pixel_width, draw)
+    lines = wrapped.split("\n")
+
+    # Measure each line individually so we can align it.
+    def line_metrics(s: str) -> tuple[int, int, int]:
+        bbox = draw.textbbox((0, 0), s, font=font)
+        return bbox[0], bbox[2] - bbox[0], bbox[3] - bbox[1]
+
+    metrics = [line_metrics(line) for line in lines]
+    line_heights = [m[2] for m in metrics] or [font_size_px]
+    # Use a uniform line spacing based on the font's typical ascent-to-descent.
+    total_h = sum(line_heights) + (len(line_heights) - 1) * max(0, font_size_px // 6)
+
+    # Top-left of the wrap box, centered around (x_norm, y_norm).
+    box_left = int(x_norm * width - max_pixel_width / 2)
+    box_top = int(y_norm * height - total_h / 2)
+
+    # Clamp the box so it stays inside the frame.
+    box_left = max(0, min(box_left, width - max_pixel_width))
+    box_top = max(0, min(box_top, height - total_h))
+
+    fill_rgba = _hex_to_rgba(font_color)
+    outline_rgba = _hex_to_rgba(outline_color)
+    outline_width = max(1, font_size_px // 16)
+
+    # Render line by line so each has its own alignment.
+    cur_y = box_top
+    for line, (lbearing, lw, lh) in zip(lines, metrics):
+        if align == "left":
+            line_x = box_left - lbearing
+        elif align == "right":
+            line_x = box_left + max_pixel_width - lw - lbearing
+        else:  # center (default)
+            line_x = box_left + (max_pixel_width - lw) // 2 - lbearing
+
+        # Outline pass: stamp the text around the offset square
+        for dx in range(-outline_width, outline_width + 1):
+            for dy in range(-outline_width, outline_width + 1):
+                draw.text((line_x + dx, cur_y + dy), line, font=font, fill=outline_rgba)
+        # Fill pass
+        draw.text((line_x, cur_y), line, font=font, fill=fill_rgba)
+
+        cur_y += lh + max(0, font_size_px // 6)
+
+    return np.array(img)
+
+
+def create_video_with_subtitles(
+    image_path: str | None,
+    audio_path: str,
+    subtitles: list[SubtitleSegment],
+    output_path: str,
+    *,
+    width: int = VIDEO_WIDTH,
+    height: int = VIDEO_HEIGHT,
+) -> None:
+    """Combine background image, audio, and subtitles into a video.
+
+    Args:
+        image_path: Path to background image, or None for solid black.
+        audio_path: Path to the narration audio file.
+        subtitles: List of SubtitleSegment objects with position/style info.
+        output_path: Where to write the output MP4.
+        width: Video width in pixels (default 1792).
+        height: Video height in pixels (default 1024).
+    """
+    audio = AudioFileClip(audio_path)
+    duration = audio.duration
+
+    # Background: image or solid black
+    if image_path:
+        bg = ImageClip(image_path).with_duration(duration).resized((width, height))
+    else:
+        black_frame = np.zeros((height, width, 3), dtype=np.uint8)
+        bg = ImageClip(black_frame).with_duration(duration)
+
+    # Create subtitle overlay clips from structured data
+    subtitle_clips = []
+    for seg in subtitles:
+        seg_duration = seg.end_time - seg.start_time
+        if seg_duration <= 0:
+            continue
+
+        frame = _render_text_frame(
+            seg.text,
+            width,
+            height,
+            x_norm=seg.position.x,
+            y_norm=seg.position.y,
+            font_size_norm=seg.style.font_size,
+            font_color=seg.style.font_color,
+            outline_color=seg.style.outline_color,
+            font_family=seg.style.font_family,
+            max_width_norm=seg.style.max_width,
+            align=seg.style.align,
+        )
+        clip = (
+            ImageClip(frame, is_mask=False)
+            .with_duration(seg_duration)
+            .with_start(seg.start_time)
+        )
+        subtitle_clips.append(clip)
+
+    final = CompositeVideoClip([bg] + subtitle_clips, size=(width, height))
+    final = final.with_audio(audio).with_duration(duration)
+
+    final.write_videofile(
+        output_path,
+        fps=30,
+        codec="libx264",
+        audio_codec="aac",
+        logger="bar",
+    )
+    print(f"Video created: {output_path}")
+
+
+# ---------------------------------------------------------------------------
+# Legacy SRT-based rendering (for CLI backward compatibility)
+# ---------------------------------------------------------------------------
 
 def parse_srt(srt_path: str) -> list[dict]:
     """Parse an SRT file into a list of {start, end, text} dicts (times in seconds)."""
@@ -41,80 +288,27 @@ def _srt_to_seconds(ts: str) -> float:
     return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
 
 
-def _render_text_frame(text: str, width: int, height: int) -> np.ndarray:
-    """Render Chinese text onto a transparent RGBA image using Pillow."""
-    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-
-    # Try to use a CJK font, fall back to default
-    font_size = 48
-    try:
-        font = ImageFont.truetype("/System/Library/Fonts/PingFang.ttc", font_size)
-    except (OSError, IOError):
-        try:
-            font = ImageFont.truetype("/System/Library/Fonts/STHeiti Light.ttc", font_size)
-        except (OSError, IOError):
-            font = ImageFont.load_default()
-
-    # Wrap long lines
-    wrapped = textwrap.fill(text, width=20)
-
-    # Get text bounding box for centering
-    bbox = draw.textbbox((0, 0), wrapped, font=font)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
-
-    x = (width - text_w) // 2
-    y = height - text_h - 80
-
-    # Draw black outline
-    for dx in range(-3, 4):
-        for dy in range(-3, 4):
-            draw.text((x + dx, y + dy), wrapped, font=font, fill=(0, 0, 0, 255))
-
-    # Draw white text on top
-    draw.text((x, y), wrapped, font=font, fill=(255, 255, 255, 255))
-
-    return np.array(img)
-
-
-def create_video_with_subtitles(
+def create_video_from_srt(
     image_path: str, audio_path: str, srt_path: str, output_path: str
-):
-    """Combine image, audio, and burned-in subtitles into a final video."""
-    segments = parse_srt(srt_path)
-    audio = AudioFileClip(audio_path)
-    duration = audio.duration
+) -> None:
+    """Legacy entry point: create video from an SRT file.
 
-    # Background image stretched to full duration
-    bg = ImageClip(image_path).with_duration(duration).resized((1792, 1024))
+    Converts SRT segments to SubtitleSegment objects with default
+    position/style and delegates to create_video_with_subtitles.
+    """
+    import uuid
+    from backend.models.subtitle import Position, SubtitleStyle
 
-    # Create subtitle overlay clips
-    subtitle_clips = []
-    for seg in segments:
-        text = seg["text"]
-        start = seg["start"]
-        end = seg["end"]
-        seg_duration = end - start
-
-        # Render text frame once, then use it as an ImageClip
-        frame = _render_text_frame(text, 1792, 1024)
-        clip = (
-            ImageClip(frame, is_mask=False)
-            .with_duration(seg_duration)
-            .with_start(start)
+    raw_segments = parse_srt(srt_path)
+    subtitle_segments = [
+        SubtitleSegment(
+            id=uuid.uuid4().hex,
+            text=seg["text"],
+            start_time=seg["start"],
+            end_time=seg["end"],
+            position=Position(x=0.5, y=0.85),
+            style=SubtitleStyle(),
         )
-        subtitle_clips.append(clip)
-
-    # Composite everything together
-    final = CompositeVideoClip([bg] + subtitle_clips, size=(1792, 1024))
-    final = final.with_audio(audio).with_duration(duration)
-
-    final.write_videofile(
-        output_path,
-        fps=30,
-        codec="libx264",
-        audio_codec="aac",
-        logger="bar",
-    )
-    print(f"Video created: {output_path}")
+        for seg in raw_segments
+    ]
+    create_video_with_subtitles(image_path, audio_path, subtitle_segments, output_path)

@@ -44,7 +44,7 @@ Property-based tests (using [Hypothesis](https://hypothesis.readthedocs.io/)) an
 
 Tests don't require any environment variables. The test helpers create isolated `Settings` instances and patch them in directly — no `.env` file needed.
 
-For the auth tests specifically, a fake `API_SECRET_KEY` is injected per test class so token validation is exercised without touching real config.
+For the auth tests specifically, `AUTH0_DOMAIN` and `AUTH0_AUDIENCE` are set via `conftest.py` so JWT validation is exercised without touching real config.
 
 ## Conventions
 
