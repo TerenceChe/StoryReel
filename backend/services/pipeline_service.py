@@ -1,7 +1,9 @@
 """Pipeline orchestration service.
 
-Coordinates narration → subtitles → video assembly, tracks progress for SSE
-streaming, and enforces per-user concurrency limits.
+Coordinates narration → subtitles, tracks progress for SSE streaming, and
+enforces per-user concurrency limits. Video assembly happens on demand
+through ``export_video`` so users can edit subtitles and positioning before
+paying the rendering cost.
 """
 
 from __future__ import annotations
@@ -107,10 +109,12 @@ class PipelineService:
         project_id: str,
         on_progress: Callable[[PipelineProgress], None] | None = None,
     ) -> None:
-        """Run the full pipeline: narration → subtitles → preview video.
+        """Run the initial pipeline: narration + subtitles.
 
-        This is designed to be called as a background task. It updates the
-        project state at each stage so SSE consumers can track progress.
+        Video assembly is deferred to ``export_video`` so users can edit
+        subtitle styles and timing first. This is designed to be called as a
+        background task. It updates the project state at each stage so SSE
+        consumers can track progress.
         """
         state = await self.project_service.get_project(project_id)
         owner_id = state.owner_id
@@ -140,14 +144,18 @@ class PipelineService:
         on_progress: Callable[[PipelineProgress], None] | None,
         start_from: str,
     ) -> None:
-        """Execute pipeline stages starting from *start_from*."""
-        stages = ["narration", "subtitles", "assembly"]
+        """Execute pipeline stages starting from *start_from*.
+
+        The initial pipeline runs narration + subtitles only. Video assembly
+        is deferred to the explicit ``export_video`` flow so users can edit
+        subtitle positions and timing before paying the rendering cost.
+        """
+        stages = ["narration", "subtitles"]
         start_idx = stages.index(start_from) if start_from in stages else 0
 
         # We use a temp dir for intermediate files, then persist via storage
         with tempfile.TemporaryDirectory() as tmp_dir:
             audio_path: str | None = None
-            audio_duration: float | None = state.audio_duration
 
             # If resuming past narration, we need the audio file locally
             if start_idx > 0:
@@ -155,15 +163,11 @@ class PipelineService:
 
             for stage in stages[start_idx:]:
                 if stage == "narration":
-                    audio_path, audio_duration = await self._stage_narration(
+                    audio_path, _ = await self._stage_narration(
                         project_id, state, tmp_dir, on_progress
                     )
                 elif stage == "subtitles":
                     await self._stage_subtitles(
-                        project_id, audio_path, tmp_dir, on_progress  # type: ignore[arg-type]
-                    )
-                elif stage == "assembly":
-                    await self._stage_assembly(
                         project_id, audio_path, tmp_dir, on_progress  # type: ignore[arg-type]
                     )
 
@@ -400,10 +404,11 @@ class PipelineService:
 
         Only valid when the project status is "error". Returns 422 otherwise.
 
-        Retry behavior:
+        Retry behavior (initial pipeline runs narration + subtitles only):
         - narration failed → rerun from scratch
-        - subtitles failed → reuse audio, rerun subtitles + assembly
-        - assembly failed  → reuse audio + subtitles, rerun assembly
+        - subtitles failed → reuse audio, rerun subtitles
+        - legacy assembly failure → rerun subtitles (the export step will
+          handle assembly when invoked separately)
         """
         state = await self.project_service.get_project(project_id)
 
@@ -416,17 +421,20 @@ class PipelineService:
         failed_stage = state.pipeline_progress.stage
         owner_id = state.owner_id
 
-        # Determine where to resume
-        if failed_stage == "error":
-            # Generic error — check what artifacts exist to decide
-            if state.audio_url and state.subtitles:
-                resume_from = "assembly"
-            elif state.audio_url:
+        # Determine where to resume.
+        # The initial pipeline only runs narration + subtitles now; assembly
+        # is handled separately by export_video. If a legacy project failed
+        # mid-assembly we resume from subtitles to recompute timestamps fresh.
+        if failed_stage == "narration":
+            resume_from = "narration"
+        elif failed_stage in ("subtitles", "assembly"):
+            resume_from = "subtitles" if not state.audio_url else "subtitles"
+        elif failed_stage == "error":
+            # Generic error — pick a resume point based on what we already have
+            if state.audio_url:
                 resume_from = "subtitles"
             else:
                 resume_from = "narration"
-        elif failed_stage in ("narration", "subtitles", "assembly"):
-            resume_from = failed_stage
         else:
             resume_from = "narration"
 

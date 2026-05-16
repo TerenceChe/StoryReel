@@ -33,8 +33,8 @@ from backend.services.project_service import ProjectService
 @pytest.fixture()
 def test_settings():
     s = Settings()
-    s.API_SECRET_KEY = "test-key"
-    s.DEV_OWNER_ID = "owner-a"
+    s.AUTH0_DOMAIN = "test-auth0.example.com"
+    s.AUTH0_AUDIENCE = "test-audience"
     s.MAX_PROJECTS_PER_USER = 20
     s.MAX_UPLOAD_SIZE_MB = 1
     return s
@@ -74,8 +74,10 @@ def client(test_settings, project_service, pipeline_service, storage):
 
 
 @pytest.fixture()
-def auth_client(test_settings, project_service, pipeline_service, storage):
+def auth_client(test_settings, project_service, pipeline_service, storage, monkeypatch):
     """Client with real auth middleware (get_owner_id NOT overridden)."""
+    import backend.auth.middleware as mw
+    monkeypatch.setattr(mw, "_fetch_jwks", lambda uri: {"keys": []})
     app.dependency_overrides[get_settings_auth] = lambda: test_settings
     app.dependency_overrides[get_settings_dep] = lambda: test_settings
     app.dependency_overrides[get_project_service] = lambda: project_service

@@ -15,6 +15,8 @@ export interface SubtitleStyle {
   fontColor: string; // hex color
   outlineColor: string; // hex color
   fontFamily: string; // font name
+  maxWidth: number; // normalized line-wrap width (fraction of video width)
+  align: "left" | "center" | "right"; // per-line horizontal alignment
 }
 
 export interface SubtitleSegment {

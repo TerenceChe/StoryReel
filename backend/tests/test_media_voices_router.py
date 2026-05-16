@@ -31,8 +31,6 @@ from backend.services.project_service import ProjectService
 @pytest.fixture()
 def test_settings():
     s = Settings()
-    s.API_SECRET_KEY = "test-key"
-    s.DEV_OWNER_ID = "owner-a"
     s.MAX_PROJECTS_PER_USER = 20
     s.MAX_UPLOAD_SIZE_MB = 1  # 1 MB for easy testing
     return s

@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, field_validator
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, UploadFile, File, status
@@ -224,12 +225,39 @@ async def pipeline_status_sse(
 async def trigger_export(
     project_id: str,
     background_tasks: BackgroundTasks,
+    body: ProjectState | None = None,
     owner_id: str = Depends(get_owner_id),
     project_service: ProjectService = Depends(get_project_service),
     pipeline_service: PipelineService = Depends(get_pipeline_service),
 ) -> dict:
-    """Trigger async video export. Returns 202 Accepted."""
-    await _load_owned_project(project_id, owner_id, project_service)
+    """Trigger async video export. Returns 202 Accepted.
+
+    Optionally accepts a draft project state in the request body. When
+    provided, the draft is saved to disk first so the export renders against
+    the user's latest edits without requiring a separate save call. This
+    matches the editor flow where edits live as in-memory drafts.
+
+    The project status is flipped to ``exporting`` synchronously before the
+    background task is queued so subsequent SSE consumers see the in-progress
+    state instead of the stale ``ready`` from the previous pipeline run.
+    """
+    state = await _load_owned_project(project_id, owner_id, project_service)
+
+    if body is not None:
+        # Validate timing on the incoming draft and merge editable fields
+        # over the persisted state (we never let a client overwrite system
+        # fields like status, pipeline_progress, version, owner_id, *_url).
+        ProjectService._validate_timing_bounds(body)  # type: ignore[attr-defined]
+        state.title = body.title
+        state.subtitles = body.subtitles
+        state.background_image = body.background_image
+
+    state.status = "exporting"
+    state.pipeline_progress = PipelineProgress(
+        stage="assembly", message="Queued for export"
+    )
+    state.updated_at = datetime.now(timezone.utc).isoformat()
+    await project_service._save_state(state)
 
     try:
         background_tasks.add_task(pipeline_service.export_video, project_id)
@@ -260,8 +288,10 @@ async def export_status_sse(
         state = project
         yield _sse_progress_event(state.pipeline_progress)
 
-        if state.status in ("exported", "error", "ready"):
-            # Already done or not exporting — send and close
+        # Already-terminal: nothing more to stream.
+        if state.status in ("exported", "error"):
+            return
+        if state.pipeline_progress.stage == "complete":
             return
 
         last_stage = state.pipeline_progress.stage
@@ -282,7 +312,7 @@ async def export_status_sse(
                 if current_stage in ("complete", "error"):
                     return
 
-            # Also close if status flipped to exported
+            # Also close if status flipped to exported (final terminal state)
             if state.status == "exported":
                 if current_stage != "complete":
                     yield _sse_progress_event(state.pipeline_progress)

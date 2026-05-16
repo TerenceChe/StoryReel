@@ -1,6 +1,8 @@
 """Local filesystem storage backend."""
 
+import os
 import shutil
+import uuid
 from pathlib import Path
 from typing import AsyncIterator
 
@@ -28,12 +30,31 @@ class LocalStorageBackend(StorageBackend):
     async def save_file(
         self, project_id: str, filename: str, data: AsyncIterator[bytes]
     ) -> str:
+        """Atomically write *filename* to the project directory.
+
+        We stream into a sibling temp file then rename, which guarantees
+        readers either see the previous version or the new version — never a
+        partially-overwritten file. This matters because state.json is hit
+        by rapid concurrent writes (e.g. style sliders).
+        """
         dest = self._file_path(project_id, filename)
         dest.parent.mkdir(parents=True, exist_ok=True)
+        # Use a unique temp name so concurrent writers don't trample each
+        # other's temp files.
+        tmp = dest.with_name(f".{dest.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
 
-        async with aiofiles.open(dest, "wb") as f:
-            async for chunk in data:
-                await f.write(chunk)
+        try:
+            async with aiofiles.open(tmp, "wb") as f:
+                async for chunk in data:
+                    await f.write(chunk)
+            os.replace(tmp, dest)
+        except Exception:
+            # Best-effort cleanup of the temp file on failure
+            try:
+                tmp.unlink(missing_ok=True)
+            except Exception:
+                pass
+            raise
 
         return str(dest)
 

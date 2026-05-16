@@ -5,8 +5,6 @@ Supports two modes:
 2. ProjectState-based rendering with per-subtitle position and style
 """
 
-import textwrap
-
 import numpy as np
 from moviepy import (
     AudioFileClip,
@@ -75,6 +73,44 @@ def _hex_to_rgba(hex_color: str, alpha: int = 255) -> tuple[int, int, int, int]:
     return (r, g, b, alpha)
 
 
+def _wrap_to_pixel_width(
+    text: str,
+    font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    max_pixel_width: int,
+    draw: ImageDraw.ImageDraw,
+) -> str:
+    """Wrap *text* so each line fits within max_pixel_width.
+
+    Works for both space-separated languages and CJK by falling back to
+    character-by-character wrapping when there are no spaces in the text.
+    Returns the wrapped text with ``\n`` between lines.
+    """
+    if max_pixel_width <= 0:
+        return text
+
+    def measure(s: str) -> int:
+        bbox = draw.textbbox((0, 0), s, font=font)
+        return bbox[2] - bbox[0]
+
+    # Try word-level wrapping first; if there are no spaces, fall back to chars.
+    has_words = any(c.isspace() for c in text)
+    units = text.split() if has_words else list(text)
+    sep = " " if has_words else ""
+
+    lines: list[str] = []
+    current = ""
+    for unit in units:
+        candidate = current + (sep if current else "") + unit
+        if measure(candidate) <= max_pixel_width or not current:
+            current = candidate
+        else:
+            lines.append(current)
+            current = unit
+    if current:
+        lines.append(current)
+    return "\n".join(lines)
+
+
 def _render_text_frame(
     text: str,
     width: int,
@@ -86,23 +122,15 @@ def _render_text_frame(
     font_color: str = "#FFFFFF",
     outline_color: str = "#000000",
     font_family: str = "Noto Sans CJK SC",
+    max_width_norm: float = 0.5,
+    align: str = "center",
 ) -> np.ndarray:
     """Render Chinese text onto a transparent RGBA image using Pillow.
 
     Positions and font size are given as normalized values (0-1 fractions of
     the video dimensions) and converted to pixel coordinates using the
-    provided width/height.
-
-    Args:
-        text: The subtitle text to render.
-        width: Frame width in pixels.
-        height: Frame height in pixels.
-        x_norm: Horizontal center position (0-1, fraction of width).
-        y_norm: Vertical center position (0-1, fraction of height).
-        font_size_norm: Font size as fraction of video height.
-        font_color: Hex color for the text fill.
-        outline_color: Hex color for the text outline.
-        font_family: Preferred font family name.
+    provided width/height. Each wrapped line is independently aligned within
+    the wrap box according to ``align``.
     """
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
@@ -110,33 +138,50 @@ def _render_text_frame(
     font_size_px = max(1, int(font_size_norm * height))
     font = _resolve_font(font_family, font_size_px)
 
-    # Wrap long lines
-    wrapped = textwrap.fill(text, width=20)
+    max_pixel_width = max(1, int(max_width_norm * width))
+    wrapped = _wrap_to_pixel_width(text, font, max_pixel_width, draw)
+    lines = wrapped.split("\n")
 
-    # Measure text bounding box
-    bbox = draw.textbbox((0, 0), wrapped, font=font)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
+    # Measure each line individually so we can align it.
+    def line_metrics(s: str) -> tuple[int, int, int]:
+        bbox = draw.textbbox((0, 0), s, font=font)
+        return bbox[0], bbox[2] - bbox[0], bbox[3] - bbox[1]
 
-    # Convert normalized position to pixel coordinates (position is the center)
-    x = int(x_norm * width - text_w / 2)
-    y = int(y_norm * height - text_h / 2)
+    metrics = [line_metrics(line) for line in lines]
+    line_heights = [m[2] for m in metrics] or [font_size_px]
+    # Use a uniform line spacing based on the font's typical ascent-to-descent.
+    total_h = sum(line_heights) + (len(line_heights) - 1) * max(0, font_size_px // 6)
 
-    # Clamp to frame boundaries
-    x = max(0, min(x, width - text_w))
-    y = max(0, min(y, height - text_h))
+    # Top-left of the wrap box, centered around (x_norm, y_norm).
+    box_left = int(x_norm * width - max_pixel_width / 2)
+    box_top = int(y_norm * height - total_h / 2)
+
+    # Clamp the box so it stays inside the frame.
+    box_left = max(0, min(box_left, width - max_pixel_width))
+    box_top = max(0, min(box_top, height - total_h))
 
     fill_rgba = _hex_to_rgba(font_color)
     outline_rgba = _hex_to_rgba(outline_color)
-
-    # Draw outline
     outline_width = max(1, font_size_px // 16)
-    for dx in range(-outline_width, outline_width + 1):
-        for dy in range(-outline_width, outline_width + 1):
-            draw.text((x + dx, y + dy), wrapped, font=font, fill=outline_rgba)
 
-    # Draw text on top
-    draw.text((x, y), wrapped, font=font, fill=fill_rgba)
+    # Render line by line so each has its own alignment.
+    cur_y = box_top
+    for line, (lbearing, lw, lh) in zip(lines, metrics):
+        if align == "left":
+            line_x = box_left - lbearing
+        elif align == "right":
+            line_x = box_left + max_pixel_width - lw - lbearing
+        else:  # center (default)
+            line_x = box_left + (max_pixel_width - lw) // 2 - lbearing
+
+        # Outline pass: stamp the text around the offset square
+        for dx in range(-outline_width, outline_width + 1):
+            for dy in range(-outline_width, outline_width + 1):
+                draw.text((line_x + dx, cur_y + dy), line, font=font, fill=outline_rgba)
+        # Fill pass
+        draw.text((line_x, cur_y), line, font=font, fill=fill_rgba)
+
+        cur_y += lh + max(0, font_size_px // 6)
 
     return np.array(img)
 
@@ -187,6 +232,8 @@ def create_video_with_subtitles(
             font_color=seg.style.font_color,
             outline_color=seg.style.outline_color,
             font_family=seg.style.font_family,
+            max_width_norm=seg.style.max_width,
+            align=seg.style.align,
         )
         clip = (
             ImageClip(frame, is_mask=False)

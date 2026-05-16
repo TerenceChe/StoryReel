@@ -30,8 +30,6 @@ from backend.services.project_service import ProjectService
 @pytest.fixture()
 def test_settings():
     s = Settings()
-    s.API_SECRET_KEY = "test-key"
-    s.DEV_OWNER_ID = "owner-a"
     s.MAX_PROJECTS_PER_USER = 20
     s.MAX_CONCURRENT_PIPELINES_PER_USER = 2
     return s
