@@ -8,17 +8,34 @@ const CJK_FONTS = [
   "sans-serif",
 ];
 
+export type StyleScope = "one" | "all";
+
 export interface SubtitleStylePanelProps {
   subtitle: SubtitleSegment;
+  /** Total subtitles in the project (used to label the toggle). */
+  totalSubtitles: number;
+  /** Current scope: edit only this subtitle, or all of them. */
+  scope: StyleScope;
+  onScopeChange: (scope: StyleScope) => void;
+  /** Style mutation respecting the current scope. */
   onStyleChange: (style: SubtitleStyle) => void;
+  /** One-shot copy of this subtitle's style to every other subtitle. */
+  onApplyToAll: () => void;
 }
 
 /**
- * Panel for editing the active subtitle's style — font size, wrap width,
- * colors, and font family. The currently editable subtitle is determined by
- * the editor: it follows the playhead unless the user pins one explicitly.
+ * Panel for editing the active subtitle's style. A scope toggle controls
+ * whether changes apply to just this subtitle or to all of them at once.
+ * The "Apply to all" button is a one-shot copy that doesn't change scope.
  */
-export function SubtitleStylePanel({ subtitle, onStyleChange }: SubtitleStylePanelProps) {
+export function SubtitleStylePanel({
+  subtitle,
+  totalSubtitles,
+  scope,
+  onScopeChange,
+  onStyleChange,
+  onApplyToAll,
+}: SubtitleStylePanelProps) {
   const { style } = subtitle;
 
   function update(patch: Partial<SubtitleStyle>) {
@@ -27,6 +44,7 @@ export function SubtitleStylePanel({ subtitle, onStyleChange }: SubtitleStylePan
 
   const approxPx = Math.round(style.fontSize * 1024);
   const wrapPct = Math.round((style.maxWidth ?? 0.5) * 100);
+  const hasOthers = totalSubtitles > 1;
 
   return (
     <div>
@@ -37,6 +55,38 @@ export function SubtitleStylePanel({ subtitle, onStyleChange }: SubtitleStylePan
         </span>
       </div>
       <p style={previewStyle}>“{subtitle.text}”</p>
+
+      {hasOthers && (
+        <div style={scopeRowStyle}>
+          <div role="group" aria-label="Edit scope" style={scopeGroupStyle}>
+            <button
+              type="button"
+              className={`btn btn-sm ${scope === "one" ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => onScopeChange("one")}
+              aria-pressed={scope === "one"}
+            >
+              This subtitle
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${scope === "all" ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => onScopeChange("all")}
+              aria-pressed={scope === "all"}
+            >
+              All ({totalSubtitles})
+            </button>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={onApplyToAll}
+            title="Copy this subtitle's style and position to every other subtitle"
+          >
+            Apply to all
+          </button>
+        </div>
+      )}
 
       <div style={controlsStyle}>
         <Field label={`Size (${approxPx}px)`}>
@@ -146,6 +196,22 @@ const previewStyle: React.CSSProperties = {
   color: "var(--text)",
   fontSize: 13,
   fontStyle: "italic",
+};
+
+const scopeRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  marginBottom: 14,
+  paddingBottom: 12,
+  borderBottom: "1px solid var(--border)",
+  flexWrap: "wrap",
+};
+
+const scopeGroupStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 4,
 };
 
 const controlsStyle: React.CSSProperties = {
