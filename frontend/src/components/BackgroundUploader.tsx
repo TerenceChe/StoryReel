@@ -26,14 +26,12 @@ export function BackgroundUploader({
       const file = e.target.files?.[0];
       if (!file) return;
 
-      // Client-side format validation
       if (!ACCEPTED_TYPES.includes(file.type)) {
         showToast("Invalid file format. Please upload a PNG or JPG image.");
         if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
 
-      // Client-side size validation
       if (file.size > MAX_FILE_SIZE_BYTES) {
         showToast(`File too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`);
         if (fileInputRef.current) fileInputRef.current.value = "";
@@ -44,6 +42,7 @@ export function BackgroundUploader({
       try {
         await uploadBackground(projectId, file);
         onBackgroundChange();
+        showToast("Background uploaded");
       } catch {
         showToast("Failed to upload background image.");
       } finally {
@@ -55,32 +54,15 @@ export function BackgroundUploader({
   );
 
   return (
-    <div
-      style={{
-        marginTop: 16,
-        padding: 12,
-        background: "#1e1e1e",
-        borderRadius: 8,
-        border: "1px solid #333",
-      }}
-    >
-      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
-        Background
-      </div>
+    <div>
+      <h3 style={{ margin: "0 0 6px" }}>Background</h3>
+      <p style={hintStyle}>
+        Custom image behind the subtitles. Defaults to solid black.
+      </p>
 
-      {/* File upload */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <label
-          style={{
-            padding: "6px 12px",
-            background: uploading ? "#555" : "#2563eb",
-            color: "#fff",
-            borderRadius: 4,
-            cursor: uploading ? "not-allowed" : "pointer",
-            fontSize: 13,
-          }}
-        >
-          {uploading ? "Uploading…" : "Upload Image"}
+      <div style={uploadRowStyle}>
+        <label className={`btn btn-primary btn-sm ${uploading ? "disabled" : ""}`}>
+          {uploading ? "Uploading…" : "Upload image"}
           <input
             ref={fileInputRef}
             type="file"
@@ -91,54 +73,50 @@ export function BackgroundUploader({
             aria-label="Upload background image"
           />
         </label>
-        <span style={{ fontSize: 12, color: "#888" }}>PNG or JPG, max {MAX_FILE_SIZE_MB}MB</span>
+        <span style={hintStyle}>
+          PNG or JPG, max {MAX_FILE_SIZE_MB}MB
+        </span>
       </div>
 
-      {/* AI generation toggle */}
-      <div style={{ borderTop: "1px solid #333", paddingTop: 10 }}>
-        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
+      <div style={aiBlockStyle}>
+        <label style={checkboxRowStyle}>
           <input
             type="checkbox"
+            style={checkboxStyle}
             checked={aiEnabled}
             onChange={(e) => setAiEnabled(e.target.checked)}
             aria-label="Enable AI background generation"
           />
-          Generate AI background
+          <span>Generate AI background</span>
         </label>
 
         {aiEnabled && (
-          <div style={{ marginTop: 8, marginLeft: 24 }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, marginBottom: 4, cursor: "pointer" }}>
+          <div style={aiOptionsStyle}>
+            <label style={radioRowStyle}>
               <input
                 type="radio"
                 name="ai-bg-mode"
                 value="single"
+                style={radioStyle}
                 checked={aiMode === "single"}
                 onChange={() => setAiMode("single")}
               />
-              Single image for entire video
+              <span>Single image for entire video</span>
             </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, marginBottom: 8, cursor: "pointer" }}>
+            <label style={radioRowStyle}>
               <input
                 type="radio"
                 name="ai-bg-mode"
                 value="multi"
+                style={radioStyle}
                 checked={aiMode === "multi"}
                 onChange={() => setAiMode("multi")}
               />
-              Multiple images per section
+              <span>Multiple images per section</span>
             </label>
-            <p
-              style={{
-                fontSize: 11,
-                color: "#f59e0b",
-                background: "#2a2000",
-                padding: "6px 8px",
-                borderRadius: 4,
-                margin: 0,
-              }}
-            >
-              This feature requires an external image generation API key. Configure it in your environment settings.
+            <p style={warnStyle}>
+              Requires an external image-generation API key. Configure it in
+              your environment settings.
             </p>
           </div>
         )}
@@ -146,3 +124,71 @@ export function BackgroundUploader({
     </div>
   );
 }
+
+const hintStyle: React.CSSProperties = {
+  margin: 0,
+  color: "var(--text-muted)",
+  fontSize: 12,
+};
+
+const uploadRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  marginTop: 12,
+  marginBottom: 12,
+  flexWrap: "wrap",
+};
+
+const aiBlockStyle: React.CSSProperties = {
+  paddingTop: 12,
+  borderTop: "1px solid var(--border)",
+};
+
+const checkboxRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  fontSize: 13,
+  color: "var(--text)",
+  margin: 0,
+  cursor: "pointer",
+};
+
+const checkboxStyle: React.CSSProperties = {
+  width: "auto",
+  margin: 0,
+  padding: 0,
+};
+
+const aiOptionsStyle: React.CSSProperties = {
+  marginTop: 8,
+  paddingLeft: 24,
+};
+
+const radioRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  fontSize: 13,
+  color: "var(--text)",
+  marginBottom: 4,
+  cursor: "pointer",
+};
+
+const radioStyle: React.CSSProperties = {
+  width: "auto",
+  margin: 0,
+  padding: 0,
+};
+
+const warnStyle: React.CSSProperties = {
+  marginTop: 8,
+  marginBottom: 0,
+  fontSize: 12,
+  color: "var(--warning)",
+  background: "rgba(217, 119, 6, 0.1)",
+  border: "1px solid rgba(217, 119, 6, 0.3)",
+  padding: "6px 10px",
+  borderRadius: "var(--radius-sm)",
+};
