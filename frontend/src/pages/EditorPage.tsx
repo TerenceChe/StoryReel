@@ -12,6 +12,9 @@ import { useToast } from "../components/Toast";
 import { useUnsavedChanges } from "../components/UnsavedChangesContext";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Project, SubtitleStyle } from "../types";
+import type { StyleScope } from "../components/SubtitleStylePanel";
+
+const STYLE_SCOPE_KEY = "story-video-editor:style-scope";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
@@ -51,6 +54,24 @@ export function EditorPage() {
   const { setDirty } = useUnsavedChanges();
   // Manual override; null means "follow the playhead automatically".
   const [pinnedSubtitleId, setPinnedSubtitleId] = useState<string | null>(null);
+
+  // Style edit scope — "one" affects only the selected subtitle, "all" applies
+  // to every subtitle in the project. Persisted across sessions.
+  const [styleScope, setStyleScope] = useState<StyleScope>(() => {
+    try {
+      const v = sessionStorage.getItem(STYLE_SCOPE_KEY);
+      return v === "all" ? "all" : "one";
+    } catch {
+      return "one";
+    }
+  });
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(STYLE_SCOPE_KEY, styleScope);
+    } catch {
+      /* ignore */
+    }
+  }, [styleScope]);
 
   // Publish dirty state up so the AppShell's nav links can confirm before
   // navigating away.
@@ -107,37 +128,56 @@ export function EditorPage() {
   const handleSubtitleMove = useCallback(
     (subtitleId: string, position: { x: number; y: number }) => {
       if (!project) return;
-      const updatedSubs = project.subtitles.map((s) =>
-        s.id === subtitleId ? { ...s, position } : s,
-      );
+      const updatedSubs = project.subtitles.map((s) => {
+        if (styleScope === "all") return { ...s, position };
+        return s.id === subtitleId ? { ...s, position } : s;
+      });
       applyLocalEdit({ subtitles: updatedSubs });
     },
-    [project, applyLocalEdit],
+    [project, styleScope, applyLocalEdit],
   );
 
   const handleSubtitleResize = useCallback(
     (subtitleId: string, maxWidth: number) => {
       if (!project) return;
-      const updatedSubs = project.subtitles.map((s) =>
-        s.id === subtitleId
+      const updatedSubs = project.subtitles.map((s) => {
+        if (styleScope === "all") return { ...s, style: { ...s.style, maxWidth } };
+        return s.id === subtitleId
           ? { ...s, style: { ...s.style, maxWidth } }
-          : s,
-      );
+          : s;
+      });
       applyLocalEdit({ subtitles: updatedSubs });
     },
-    [project, applyLocalEdit],
+    [project, styleScope, applyLocalEdit],
   );
 
   const handleStyleChange = useCallback(
     (style: SubtitleStyle) => {
       if (!project || !selectedSubtitleId) return;
-      const updatedSubs = project.subtitles.map((s) =>
-        s.id === selectedSubtitleId ? { ...s, style } : s,
-      );
+      const updatedSubs = project.subtitles.map((s) => {
+        // "all" applies the new style to every subtitle so they stay
+        // visually in sync; "one" only touches the active subtitle.
+        if (styleScope === "all") return { ...s, style };
+        return s.id === selectedSubtitleId ? { ...s, style } : s;
+      });
       applyLocalEdit({ subtitles: updatedSubs });
     },
-    [project, selectedSubtitleId, applyLocalEdit],
+    [project, selectedSubtitleId, styleScope, applyLocalEdit],
   );
+
+  /** One-shot: copy the active subtitle's style + position onto every other subtitle. */
+  const handleApplyStyleToAll = useCallback(() => {
+    if (!project || !selectedSubtitle) return;
+    const sourceStyle = selectedSubtitle.style;
+    const sourcePosition = selectedSubtitle.position;
+    const updatedSubs = project.subtitles.map((s) => ({
+      ...s,
+      style: sourceStyle,
+      position: sourcePosition,
+    }));
+    applyLocalEdit({ subtitles: updatedSubs });
+    showToast(`Applied to all ${updatedSubs.length} subtitles`);
+  }, [project, selectedSubtitle, applyLocalEdit, showToast]);
 
   const handleTimingChange = useCallback(
     (subtitleId: string, startTime: number, endTime: number) => {
@@ -231,7 +271,9 @@ export function EditorPage() {
           <div style={editorStyles.cardHeader}>
             <h3 style={{ margin: 0 }}>Editor preview</h3>
             <span style={editorStyles.cardHint}>
-              Drag subtitles to reposition.
+              {styleScope === "all"
+                ? "Drag or resize — applies to all subtitles."
+                : "Drag or resize the selected subtitle."}
             </span>
           </div>
           <div style={editorStyles.canvasWrap}>
@@ -296,7 +338,11 @@ export function EditorPage() {
         <section className="card" style={editorStyles.section}>
           <SubtitleStylePanel
             subtitle={selectedSubtitle}
+            totalSubtitles={project.subtitles.length}
+            scope={styleScope}
+            onScopeChange={setStyleScope}
             onStyleChange={handleStyleChange}
+            onApplyToAll={handleApplyStyleToAll}
           />
         </section>
       )}
