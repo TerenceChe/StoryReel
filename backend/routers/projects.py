@@ -459,13 +459,26 @@ async def upload_background(
 
     Validates format and enforces MAX_UPLOAD_SIZE_MB limit.
     """
+    logger.info(
+        "Background upload received: content_type=%s filename=%s",
+        file.content_type,
+        file.filename,
+    )
     await _load_owned_project(project_id, owner_id, project_service)
 
-    # Validate content type
-    if file.content_type not in _ALLOWED_IMAGE_TYPES:
+    # Validate content type. Some browsers / OSes send odd or empty values
+    # (e.g. "application/octet-stream" for files dragged from certain apps),
+    # so fall back to checking the filename extension.
+    ct = (file.content_type or "").lower()
+    name = (file.filename or "").lower()
+    has_image_ext = name.endswith((".png", ".jpg", ".jpeg"))
+    if ct not in _ALLOWED_IMAGE_TYPES and not has_image_ext:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Unsupported file format: {file.content_type}. Only PNG and JPG are accepted.",
+            detail=(
+                f"Unsupported file format: content_type={file.content_type!r}, "
+                f"filename={file.filename!r}. Only PNG and JPG are accepted."
+            ),
         )
 
     # Read file and check size

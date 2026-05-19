@@ -94,11 +94,14 @@ export async function uploadBackground(
 ): Promise<{ detail: string; backgroundImage: string }> {
   const form = new FormData();
   form.append("file", file);
+  // Don't set Content-Type — axios/the browser will auto-set it including
+  // the multipart boundary. Forcing "multipart/form-data" without a
+  // boundary breaks parsing on the server.
   const { data } = await apiClient.post<{
     detail: string;
     backgroundImage: string;
   }>(`/projects/${id}/background`, form, {
-    headers: { "Content-Type": "multipart/form-data" },
+    headers: { "Content-Type": undefined as unknown as string },
   });
   return data;
 }

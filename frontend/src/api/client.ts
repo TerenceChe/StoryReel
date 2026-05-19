@@ -17,6 +17,22 @@ export function configureAuth(getToken: () => Promise<string>) {
   _getToken = getToken;
 }
 
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  if (v === null || typeof v !== "object") return false;
+  if (Array.isArray(v)) return true;
+  // Skip browser/runtime types we shouldn't enumerate.
+  if (typeof FormData !== "undefined" && v instanceof FormData) return false;
+  if (typeof Blob !== "undefined" && v instanceof Blob) return false;
+  if (typeof ArrayBuffer !== "undefined" && v instanceof ArrayBuffer) return false;
+  if (typeof File !== "undefined" && v instanceof File) return false;
+  if (
+    typeof URLSearchParams !== "undefined" &&
+    v instanceof URLSearchParams
+  )
+    return false;
+  return true;
+}
+
 apiClient.interceptors.request.use(async (config) => {
   if (_getToken) {
     try {
@@ -26,7 +42,7 @@ apiClient.interceptors.request.use(async (config) => {
       // Token retrieval failed — request will go out without auth header
     }
   }
-  if (config.data && typeof config.data === "object") {
+  if (isPlainObject(config.data)) {
     config.data = toSnakeCase(config.data);
   }
   return config;
@@ -67,7 +83,7 @@ export function toCamelCase<T>(data: T): T {
 }
 
 apiClient.interceptors.response.use((response) => {
-  if (response.data && typeof response.data === "object") {
+  if (isPlainObject(response.data)) {
     response.data = toCamelCase(response.data);
   }
   return response;
