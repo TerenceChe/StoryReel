@@ -70,6 +70,7 @@ def _auth_headers():
 
 def _create_project(client: TestClient, text: str = "一个故事", **kwargs) -> dict:
     body = {"story_text": text, **kwargs}
+    body.setdefault("title", f"Title-{text}")
     resp = client.post("/projects", json=body)
     assert resp.status_code == 201, resp.text
     return resp.json()
@@ -109,7 +110,9 @@ class TestCreateProject:
         test_settings.MAX_PROJECTS_PER_USER = 2
         _create_project(client, text="story 1")
         _create_project(client, text="story 2")
-        resp = client.post("/projects", json={"story_text": "story 3"})
+        resp = client.post(
+            "/projects", json={"story_text": "story 3", "title": "Title 3"}
+        )
         assert resp.status_code == 429
 
 
@@ -132,7 +135,16 @@ class TestListProjects:
         assert len(items) == 2
         # Summaries should have these keys and NOT full state keys
         for item in items:
-            assert set(item.keys()) == {"id", "title", "status", "created_at", "updated_at"}
+            assert set(item.keys()) == {
+                "id",
+                "title",
+                "status",
+                "version",
+                "created_at",
+                "updated_at",
+            }
+            # Newly created projects start at version 1.
+            assert item["version"] == 1
 
 
 # ---------------------------------------------------------------------------

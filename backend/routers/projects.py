@@ -40,6 +40,7 @@ from backend.services.project_service import (
     ProjectNotFoundError,
     ProjectService,
     TimingValidationError,
+    TitleConflictError,
     VersionConflictError,
 )
 
@@ -56,7 +57,7 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 class CreateProjectRequest(BaseModel):
     story_text: str
     voice: str = "zh-CN-XiaoxiaoNeural"
-    title: str | None = None
+    title: str
 
     @field_validator("story_text")
     @classmethod
@@ -66,10 +67,16 @@ class CreateProjectRequest(BaseModel):
         return v
 
 
+class RenameTitleRequest(BaseModel):
+    title: str
+    version: int
+
+
 class ProjectSummary(BaseModel):
     id: str
     title: str
     status: str
+    version: int
     created_at: str
     updated_at: str
 
@@ -146,6 +153,38 @@ async def update_project(
     except TimingValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        )
+    return updated
+
+
+@router.patch("/{project_id}/title")
+async def rename_title(
+    project_id: str,
+    body: RenameTitleRequest,
+    owner_id: str = Depends(get_owner_id),
+    project_service: ProjectService = Depends(get_project_service),
+) -> ProjectState:
+    """Rename a project's title.
+
+    Validates the new title via the title validator, enforces optimistic
+    concurrency via ``version``, and returns the updated project state on
+    success. ``TitleValidationError`` (including duplicates) is mapped to
+    structured responses by the global exception handler in
+    ``backend/main.py``.
+    """
+    await _load_owned_project(project_id, owner_id, project_service)
+
+    try:
+        updated = await project_service.rename_title(
+            project_id=project_id,
+            owner_id=owner_id,
+            candidate=body.title,
+            expected_version=body.version,
+        )
+    except VersionConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
         )
     return updated

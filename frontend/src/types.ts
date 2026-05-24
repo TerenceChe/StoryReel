@@ -62,6 +62,7 @@ export interface ProjectSummary {
   id: string;
   title: string;
   status: Project["status"];
+  version: number;
   createdAt: string;
   updatedAt: string;
 }

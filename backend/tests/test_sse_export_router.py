@@ -68,7 +68,9 @@ def client(test_settings, project_service, pipeline_service):
 
 
 def _create_project(client: TestClient, text: str = "一个故事") -> dict:
-    resp = client.post("/projects", json={"story_text": text})
+    resp = client.post(
+        "/projects", json={"story_text": text, "title": f"Title-{text}"}
+    )
     assert resp.status_code == 201, resp.text
     return resp.json()
 

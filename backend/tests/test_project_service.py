@@ -245,8 +245,11 @@ class TestProjectIDUniqueness:
 
         async def _run():
             ids = []
-            for _ in range(count):
-                project = await svc.create_project(story_text=story, owner_id=owner)
+            for i in range(count):
+                # Title must be unique per owner (Requirement 3); use index.
+                project = await svc.create_project(
+                    story_text=story, owner_id=owner, title=f"title-{i}"
+                )
                 ids.append(project.id)
             return ids
 
@@ -266,7 +269,9 @@ class TestProjectIDUniqueness:
         svc = ProjectService(storage=storage, settings=svc_settings)
 
         async def _run():
-            return await svc.create_project(story_text="测试故事", owner_id=owner)
+            return await svc.create_project(
+                story_text="测试故事", owner_id=owner, title="测试标题"
+            )
 
         project = asyncio.get_event_loop().run_until_complete(_run())
         assert len(project.id) == 32

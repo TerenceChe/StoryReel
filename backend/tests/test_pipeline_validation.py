@@ -178,7 +178,9 @@ class TestProjectCreationForValidText:
         svc = ProjectService(storage=storage, settings=svc_settings)
 
         async def _run():
-            return await svc.create_project(story_text=text, owner_id=owner)
+            return await svc.create_project(
+                story_text=text, owner_id=owner, title="valid-title"
+            )
 
         project = asyncio.get_event_loop().run_until_complete(_run())
 
@@ -200,7 +202,9 @@ class TestProjectCreationForValidText:
         svc = ProjectService(storage=storage, settings=svc_settings)
 
         async def _run():
-            return await svc.create_project(story_text=text, owner_id=owner)
+            return await svc.create_project(
+                story_text=text, owner_id=owner, title="valid-title"
+            )
 
         project = asyncio.get_event_loop().run_until_complete(_run())
         assert project.status == "pending"
@@ -236,7 +240,7 @@ class TestVoiceSelectionPropagation:
 
         async def _run():
             return await svc.create_project(
-                story_text=text, owner_id=owner, voice=voice
+                story_text=text, owner_id=owner, voice=voice, title="valid-title"
             )
 
         project = asyncio.get_event_loop().run_until_complete(_run())
@@ -273,7 +277,7 @@ class TestVoiceSelectionPropagation:
 
         async def _run():
             project = await proj_svc.create_project(
-                story_text=text, owner_id=owner, voice=voice
+                story_text=text, owner_id=owner, voice=voice, title="valid-title"
             )
             # Patch generate_narration to capture the voice argument
             with patch(
