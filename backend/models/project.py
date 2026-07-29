@@ -12,6 +12,12 @@ class PipelineProgress(BaseModel):
     message: str
 
 
+class SectionBackground(BaseModel):
+    start_index: int
+    end_index: int
+    image_url: str
+
+
 class ProjectState(BaseModel):
     id: str
     owner_id: str
@@ -23,6 +29,7 @@ class ProjectState(BaseModel):
     pipeline_progress: PipelineProgress
     subtitles: list[SubtitleSegment] = []
     background_image: str | None = None
+    section_backgrounds: list[SectionBackground] = []
     video_url: str | None = None
     audio_url: str | None = None
     audio_duration: float | None = None

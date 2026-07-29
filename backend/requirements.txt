@@ -15,3 +15,10 @@ Pillow>=10.0.0
 python-dotenv>=1.0.0
 aiofiles>=23.0.0
 PyJWT[crypto]>=2.8.0
+
+# Optional image-generation provider SDK. Only required when
+# IMAGE_GEN_PROVIDER=openai is configured by the operator; the dependency
+# container falls back to the disabled backend when this is not installed
+# (see backend/dependencies.py). Kept optional so deployments that leave
+# image generation disabled do not pull the provider SDK.
+openai>=1.0.0

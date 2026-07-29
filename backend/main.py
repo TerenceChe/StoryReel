@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend.config import settings
+from backend.routers.image_generation import router as image_generation_router
+from backend.routers.image_jobs import router as image_jobs_router
 from backend.routers.projects import router as projects_router
 from backend.routers.voices import router as voices_router
 from backend.services.project_service import TitleConflictError
@@ -116,6 +118,8 @@ async def title_required_validation_handler(
 
 app.include_router(projects_router)
 app.include_router(voices_router)
+app.include_router(image_jobs_router)
+app.include_router(image_generation_router)
 
 
 @app.get("/health")

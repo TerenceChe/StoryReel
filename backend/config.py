@@ -13,6 +13,10 @@ class Settings:
     MAX_UPLOAD_SIZE_MB: int = int(os.getenv("MAX_UPLOAD_SIZE_MB", "50"))
     CORS_ORIGINS: list[str] = os.getenv("CORS_ORIGINS", "*").split(",")
     DATA_DIR: str = os.getenv("DATA_DIR", "./data")
+    IMAGE_GEN_PROVIDER: str = os.getenv("IMAGE_GEN_PROVIDER", "")
+    MAX_IMAGES_PER_JOB: int = int(os.getenv("MAX_IMAGES_PER_JOB", "4"))
+    MAX_CONCURRENT_IMAGE_JOBS_PER_USER: int = int(os.getenv("MAX_CONCURRENT_IMAGE_JOBS_PER_USER", "2"))
+    MAX_REFERENCE_IMAGE_SIZE_MB: int = int(os.getenv("MAX_REFERENCE_IMAGE_SIZE_MB", os.getenv("MAX_UPLOAD_SIZE_MB", "50")))
 
     @property
     def JWT_ISSUER(self) -> str | None:
